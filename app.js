@@ -1,24 +1,10 @@
 const fs = require('fs');
 const request = require('request');
 const rp = require('request-promise');
-
-// 获取所有视频的 id
-function getVideoList() {
-  return new Promise((resolve, reject) => {
-    fs.readFile('./response.json', 'utf8', function (err, data) {
-      if (err) {
-        reject(err)
-      };
-      const da = JSON.parse(data);//读取的值
-      const videoList = da.map(item => ({ id: item.aweme_id, desc: item.desc }))
-      console.log('共 ' + videoList.length + ' 个视频')
-      resolve(videoList)
-    });
-  })
-}
+const generateSignature = require('./utils/generateSignature')
 
 /**
- * 通过视频 id 取得视频无水印真实链接
+ * 通过视频 id 获得视频无水印真实链接
  * @param {string} id 视频 id
  * @returns 视频无水印真实链接
  */
@@ -37,12 +23,12 @@ function getTrueVideoUrl(id) {
 }
 
 /**
- * 下载视频到本地
+ * 下载视频到本地 /data/${nickname} 文件夹下
  * @param {string} url 视频 url
  */
-function download(url, filename='filename') {
+function download(url, nickname, filename='filename') {
   return new Promise((resolve, reject) => {
-    let stream = fs.createWriteStream('./data/' + filename + '.mp4');
+    let stream = fs.createWriteStream(`./data/${nickname}/${filename}.mp4`);
     request({
       url: url,
       followRedirect: true,
@@ -59,19 +45,104 @@ function download(url, filename='filename') {
   })
 }
 
+/**
+ * 获取用户信息
+ * @param {string} sec_uid 用户 id
+ * @returns 用户信息
+ */
+function getUserInfo(sec_uid) {
+  return new Promise((resolve, reject) => {
+    rp({
+      method: 'get',
+      uri: 'https://www.iesdouyin.com/web/api/v2/user/info/?sec_uid=' + sec_uid,
+      json: true
+    }).then(info => {
+      resolve(info)
+    }).catch(reject)
+  })
+}
+
+/**
+ * 
+ * @param {string} sec_uid  用户 id
+ * @param {number | string} count  用户视频个数
+ * @param {number | string} max_cursor 时间最大值 1656743890000 => 2022-07-02 14:38:10
+ * @returns 
+ */
+function getVideoList(sec_uid, count, max_cursor) {
+  return new Promise((resolve, reject) => {
+    const _signature = generateSignature(sec_uid)
+    rp({
+      method: 'get',
+      uri: 'https://www.iesdouyin.com/web/api/v2/aweme/post/',
+      qs: {
+        sec_uid,
+        count,
+        max_cursor,
+        _signature
+      },
+      json: true
+    }).then(res => {
+      resolve({
+        has_more: res.has_more,
+        max_cursor: res.max_cursor,
+        aweme_id_list: res.aweme_list.map(item => ({ id: item.aweme_id, desc: item.desc }))
+      })
+    }).catch(reject)
+  })
+}
+
+/**
+ * 循环获取 id 数据
+ * @param {string} sec_uid 
+ * @param {number | string} count 
+ * @param {number | string} maxCursor 
+ * @returns 
+ */
+async function getVideoListRec(sec_uid, count, maxCursor) {
+  if (!sec_uid || !count || !maxCursor) {
+    console.log('参数错误')
+    return []
+  }
+  let hasMore = true
+  let max_cursor = maxCursor
+  let awemeIdList = []
+  while(hasMore) {
+    const res = await getVideoList(sec_uid, count, max_cursor)
+    hasMore = res.has_more
+    max_cursor = res.max_cursor
+    awemeIdList = awemeIdList.concat(res.aweme_id_list)
+  }
+  return awemeIdList
+}
+
 async function main() {
-  const videoList = await getVideoList()
-  // 顺序下载
+  var argv = process.argv.splice(2) // 命令行参数
+  const sec_uid = argv && argv.length > 0 ? argv[0] : 'MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w'
+  const info = await getUserInfo(sec_uid)
+  if (!info) {
+    console.log('获取用户信息失败')
+  }
+  const nickname = info.user_info.nickname.replace(/\s|\r|\r\n|\n/g, '-')
+  console.log('用户：' + nickname)
+  const videoList = await getVideoListRec(sec_uid, info.user_info.aweme_count, info.extra.now)
+  if (!videoList || videoList.length <= 0) {
+    return
+  }
+  console.log(`共获取到${videoList.length}个视频`)
+  // 串行下载
   for(let index = 0; index < videoList.length; index++) {
     try {
       const url = await getTrueVideoUrl(videoList[index].id)
-      // await download(url, String(index))
-      await download(url, videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '-'))
+      if (!fs.existsSync('./data/' + nickname)) {
+        fs.mkdirSync('./data/' + nickname)
+      }
+      await download(url, nickname, videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '-'))
     } catch(err) {
       console.log(err)
     }
   }
-  // 同时下载，速度快，但数量多了会报错
+  // 并行下载，速度快，但数量多了会报错
   // videoList.forEach(async (item, index) => {
   //   if (!(index > 90 && index <= 120)) {
   //     return
