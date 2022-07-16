@@ -1,10 +1,11 @@
 const fs = require('fs');
+const moment = require('moment');
 const request = require('request');
 const rp = require('request-promise');
 const generateSignature = require('./utils/generateSignature')
 
 /**
- * 通过视频 id 获得视频无水印真实链接
+ * 通过视频 id 获得视频无水印真实链接和视频发布日期
  * @param {string} id 视频 id
  * @returns 视频无水印真实链接
  */
@@ -17,7 +18,10 @@ function getTrueVideoUrl(id) {
     }).then(res => {
       let url = res.item_list[0].video.play_addr.url_list[0]
       const noWaterMarkUrl = url.replace('playwm', 'play')
-      resolve(noWaterMarkUrl)
+      resolve({
+        url: noWaterMarkUrl,
+        create_time: res.item_list[0].create_time
+      })
     }).catch(reject)
   })
 }
@@ -123,7 +127,7 @@ async function main() {
   if (!info) {
     console.log('获取用户信息失败')
   }
-  const nickname = info.user_info.nickname.replace(/\s|\r|\r\n|\n/g, '-')
+  const nickname = info.user_info.nickname.replace(/\s|\r|\r\n|\n/g, '_')
   console.log('用户：' + nickname)
   const videoList = await getVideoListRec(sec_uid, info.user_info.aweme_count, info.extra.now)
   if (!videoList || videoList.length <= 0) {
@@ -133,11 +137,12 @@ async function main() {
   // 串行下载
   for(let index = 0; index < videoList.length; index++) {
     try {
-      const url = await getTrueVideoUrl(videoList[index].id)
+      const {url, create_time} = await getTrueVideoUrl(videoList[index].id)
+      const createDataStr = moment.unix(create_time).format('YYYY-MM-DD_HH_mm_ss')
       if (!fs.existsSync('./data/' + nickname)) {
         fs.mkdirSync('./data/' + nickname)
       }
-      await download(url, nickname, videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '-'))
+      await download(url, nickname, createDataStr + videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '_'))
     } catch(err) {
       console.log(err)
     }
