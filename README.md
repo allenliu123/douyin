@@ -6,8 +6,10 @@
 
 使用浏览器随便打开一个用户的个人主页 https://www.douyin.com/user/MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w
 
+``` bash
 npm install
 node app.js MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w
+```
 
 ## 免责声明
 
