@@ -8,7 +8,7 @@
 
 ``` bash
 npm install
-node app.js MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w
+node app.js https://www.douyin.com/user/MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w
 ```
 
 ## 免责声明
