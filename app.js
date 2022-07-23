@@ -121,11 +121,17 @@ async function getVideoListRec(sec_uid, count, maxCursor) {
 }
 
 async function main() {
-  var argv = process.argv.splice(2) // 命令行参数
-  const sec_uid = argv && argv.length > 0 ? argv[0] : 'MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w'
+  let argv = process.argv.splice(2) // 命令行参数
+  let sec_uid = argv && argv.length > 0 ? argv[0] : ''
+  sec_uid = sec_uid.replace('https://www.douyin.com/user/', '')
+  if (!sec_uid) {
+    console.log('参数错误')
+    return
+  }
   const info = await getUserInfo(sec_uid)
-  if (!info) {
+  if (!info || !info.user_info) {
     console.log('获取用户信息失败')
+    return
   }
   const nickname = info.user_info.nickname.replace(/\s|\r|\r\n|\n/g, '_')
   console.log('用户：' + nickname)
