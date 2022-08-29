@@ -120,6 +120,11 @@ async function getVideoListRec(sec_uid, count, maxCursor) {
   return awemeIdList
 }
 
+// sleep
+function sleep(time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
+
 async function main() {
   let argv = process.argv.splice(2) // 命令行参数
   let sec_uid = argv && argv.length > 0 ? argv[0] : ''
@@ -149,6 +154,7 @@ async function main() {
         fs.mkdirSync('./data/' + nickname)
       }
       await download(url, nickname, createDataStr + videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '_'))
+      await sleep(1000)
     } catch(err) {
       console.log(err)
     }
