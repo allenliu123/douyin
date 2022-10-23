@@ -1,7 +1,12 @@
-const fs = require('fs');
-const moment = require('moment');
-const request = require('request');
-const rp = require('request-promise');
+const fs = require('fs')
+const moment = require('moment')
+const request = require('request')
+const rp = require('request-promise')
+const {
+  parseShareUrl,
+  matchIdFromShareUrl,
+  shareUrl
+} = require('douyin-tools')
 const generateSignature = require('./utils/generateSignature')
 
 /**
@@ -20,7 +25,8 @@ function getTrueVideoUrl(id) {
       const noWaterMarkUrl = url.replace('playwm', 'play')
       resolve({
         url: noWaterMarkUrl,
-        create_time: res.item_list[0].create_time
+        create_time: res.item_list[0].create_time,
+        desc: res.item_list[0].desc
       })
     }).catch(reject)
   })
@@ -31,8 +37,11 @@ function getTrueVideoUrl(id) {
  * @param {string} url 视频 url
  */
 function download(url, nickname, filename='filename') {
+  if (!fs.existsSync('./data/' + nickname)) {
+    fs.mkdirSync('./data/' + nickname)
+  }
   return new Promise((resolve, reject) => {
-    let stream = fs.createWriteStream(`./data/${nickname}/${filename}.mp4`);
+    let stream = fs.createWriteStream(`./data/${nickname}/${filename}.mp4`)
     request({
       url: url,
       followRedirect: true,
@@ -40,12 +49,12 @@ function download(url, nickname, filename='filename') {
         'User-Agent': 'Request-Promise'
       }
     }).pipe(stream).on('close', () => {
-      console.log(filename + ' download success');
+      console.log(filename + ' download success')
       resolve('')
     }).on('error', (err) => {
       console.log(err)
       reject(err)
-    });
+    })
   })
 }
 
@@ -122,17 +131,11 @@ async function getVideoListRec(sec_uid, count, maxCursor) {
 
 // sleep
 function sleep(time) {
-  return new Promise((resolve) => setTimeout(resolve, time));
+  return new Promise((resolve) => setTimeout(resolve, time))
 }
 
-async function main() {
-  let argv = process.argv.splice(2) // 命令行参数
-  let sec_uid = argv && argv.length > 0 ? argv[0] : ''
-  sec_uid = sec_uid.replace('https://www.douyin.com/user/', '')
-  if (!sec_uid) {
-    console.log('参数错误')
-    return
-  }
+// 下载某个用户所有视频
+async function downloadUserAllVideo(sec_uid) {
   const info = await getUserInfo(sec_uid)
   if (!info || !info.user_info) {
     console.log('获取用户信息失败')
@@ -150,28 +153,36 @@ async function main() {
     try {
       const {url, create_time} = await getTrueVideoUrl(videoList[index].id)
       const createDataStr = moment.unix(create_time).format('YYYY-MM-DD_HH_mm_ss')
-      if (!fs.existsSync('./data/' + nickname)) {
-        fs.mkdirSync('./data/' + nickname)
-      }
-      await download(url, nickname, createDataStr + videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '_'))
+      await download(url, nickname, videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '_') + createDataStr)
       await sleep(1000)
     } catch(err) {
       console.log(err)
     }
   }
-  // 并行下载，速度快，但数量多了会报错
-  // videoList.forEach(async (item, index) => {
-  //   if (!(index > 90 && index <= 120)) {
-  //     return
-  //   }
-  //   try {
-  //     const url = await getTrueVideoUrl(item.id)
-  //     await download(url, String(index))
-  //     // await download(url, item.desc.replace(/\s|\r|\r\n|\n/g, '-'))
-  //   } catch(err) {
-  //     console.log(err)
-  //   }
-  // })
+}
+
+async function handleShare(params) {
+  const shareUrlStr = parseShareUrl(params)
+  const trueUrl = await shareUrl(shareUrlStr)
+  const videoId = matchIdFromShareUrl(trueUrl)
+  const { url, create_time, desc } = await getTrueVideoUrl(videoId)
+  const createDataStr = moment.unix(create_time).format('YYYY-MM-DD_HH_mm_ss')
+  download(url, '分享口令下载', desc.replace(/\s|\r|\r\n|\n/g, '_') +createDataStr)
+}
+
+async function main() {
+  const argv = process.argv.splice(2) // 命令行参数
+  const params = argv && argv.length > 0 ? argv[0] : ''
+  if (params.indexOf('v.douyin.com') > -1) { // 参数是分享口令
+    handleShare(params)
+  } else { // 参数是用户主页
+    const sec_uid = params.replace('https://www.douyin.com/user/', '')
+    if (!sec_uid) {
+      console.log('参数错误')
+      return
+    }
+    downloadUserAllVideo(sec_uid)
+  }
 }
 
 main()
