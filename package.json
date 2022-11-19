@@ -1,6 +1,6 @@
 {
   "name": "douyin",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "下载抖音某个用户的所有无水印视频",
   "main": "app.js",
   "scripts": {

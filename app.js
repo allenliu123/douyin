@@ -9,6 +9,11 @@ const {
 } = require('douyin-tools')
 const generateSignature = require('./utils/generateSignature')
 
+// sleep
+function sleep(time) {
+  return new Promise((resolve) => setTimeout(resolve, time))
+}
+
 /**
  * 通过视频 id 获得视频无水印真实链接和视频发布日期
  * @param {string} id 视频 id
@@ -40,8 +45,15 @@ function download(url, nickname, filename='filename') {
   if (!fs.existsSync('./data/' + nickname)) {
     fs.mkdirSync('./data/' + nickname)
   }
-  return new Promise((resolve, reject) => {
-    let stream = fs.createWriteStream(`./data/${nickname}/${filename}.mp4`)
+  const filePath = `./data/${nickname}/${filename}.mp4`
+  // 跳过已经下载过的视频
+  if (fs.existsSync(filePath)) {
+    console.log(filePath + ' 已存在，跳过！')
+    return Promise.resolve()
+  }
+  return new Promise(async (resolve, reject) => {
+    await sleep(1000) // 为避免风控，每下载一个视频等待一秒
+    let stream = fs.createWriteStream(filePath)
     request({
       url: url,
       followRedirect: true,
@@ -49,7 +61,7 @@ function download(url, nickname, filename='filename') {
         'User-Agent': 'Request-Promise'
       }
     }).pipe(stream).on('close', () => {
-      console.log(filename + ' download success')
+      console.log(filename + ' 下载成功')
       resolve('')
     }).on('error', (err) => {
       console.log(err)
@@ -129,11 +141,6 @@ async function getVideoListRec(sec_uid, count, maxCursor) {
   return awemeIdList
 }
 
-// sleep
-function sleep(time) {
-  return new Promise((resolve) => setTimeout(resolve, time))
-}
-
 // 下载某个用户所有视频
 async function downloadUserAllVideo(sec_uid) {
   const info = await getUserInfo(sec_uid)
@@ -154,7 +161,6 @@ async function downloadUserAllVideo(sec_uid) {
       const {url, create_time} = await getTrueVideoUrl(videoList[index].id)
       const createDataStr = moment.unix(create_time).format('YYYY-MM-DD_HH_mm_ss')
       await download(url, nickname, videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '_') + createDataStr)
-      await sleep(1000)
     } catch(err) {
       console.log(err)
     }
