@@ -160,7 +160,8 @@ async function downloadUserAllVideo(sec_uid) {
     try {
       const {url, create_time} = await getTrueVideoUrl(videoList[index].id)
       const createDataStr = moment.unix(create_time).format('YYYY-MM-DD_HH_mm_ss')
-      await download(url, nickname, videoList[index].desc.replace(/\s|\r|\r\n|\n/g, '_') + createDataStr)
+      const filename = videoList[index].desc.replace(/[\/\\\:\*\<\?\>\"\'\|]|\s|\r|\r\n|\n/g, '_')
+      await download(url, nickname, filename + createDataStr)
     } catch(err) {
       console.log(err)
     }
@@ -173,7 +174,8 @@ async function handleShare(params) {
   const videoId = matchIdFromShareUrl(trueUrl)
   const { url, create_time, desc } = await getTrueVideoUrl(videoId)
   const createDataStr = moment.unix(create_time).format('YYYY-MM-DD_HH_mm_ss')
-  download(url, '分享口令下载', desc.replace(/\s|\r|\r\n|\n/g, '_') +createDataStr)
+  const filename = desc.replace(/[\/\\\:\*\<\?\>\"\'\|]|\s|\r|\r\n|\n/g, '_')
+  download(url, '分享口令下载', filename + createDataStr)
 }
 
 async function main() {
@@ -182,9 +184,10 @@ async function main() {
   if (params.indexOf('v.douyin.com') > -1) { // 参数是分享口令
     handleShare(params)
   } else { // 参数是用户主页
-    const sec_uid = params.replace('https://www.douyin.com/user/', '')
+    const sec_uid = params.match(/(https:\/\/www.douyin.com\/user\/)?([\w|-]+)\??.*/)[2]
+    // const sec_uid = params.replace('https://www.douyin.com/user/', '')
     if (!sec_uid) {
-      console.log('参数错误')
+      console.log('参数错误，请输入用户主页链接，例如：node app.js https://www.douyin.com/user/MS4wLjABAAAAJqTyV9DKLyl-0JoeAU1BiZW2PWyfBX17JyeXK1YmE-w?vid=7169880604983463168')
       return
     }
     downloadUserAllVideo(sec_uid)
